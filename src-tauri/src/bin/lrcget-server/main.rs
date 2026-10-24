@@ -6,6 +6,7 @@
 mod api;
 mod auth;
 mod files;
+mod jobs;
 mod transcode;
 
 use axum::extract::DefaultBodyLimit;
@@ -110,6 +111,7 @@ pub struct Server {
     pub ctx: Ctx,
     pub config: Arc<Config>,
     pub events: broadcast::Sender<String>,
+    pub jobs: Arc<jobs::Jobs>,
 }
 
 /// Broadcasts backend events to every connected browser over `/api/events`.
@@ -168,6 +170,7 @@ async fn main() {
     let bind = config.bind;
     let web_dir = config.web_dir.clone();
     let server = Server {
+        jobs: jobs::Jobs::start(ctx.clone()),
         ctx,
         config: Arc::new(config),
         events,

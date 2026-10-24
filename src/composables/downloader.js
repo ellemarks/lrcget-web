@@ -1,5 +1,5 @@
 import { computed, markRaw, ref } from 'vue'
-import { invoke } from '@/platform'
+import { invoke, isTauri, listen } from '@/platform'
 
 const delay = time => new Promise(resolve => setTimeout(resolve, time))
 
@@ -99,7 +99,25 @@ const downloadLyrics = async (track, autoExport) => {
   downloadedCount.value++
 }
 
+// Browser: the server runs the queue so it keeps going in background tabs (where timers are
+// throttled) and broadcasts its state; this mirrors it into the same refs.
+const applyServerState = state => {
+  isDownloading.value = state.isDownloading
+  totalCount.value = state.totalCount
+  downloadedCount.value = state.downloadedCount
+  successCount.value = state.successCount
+  failureCount.value = state.failureCount
+  cooldownRemaining.value = state.cooldownRemaining
+  log.value = state.log.map(entry => markRaw(entry))
+}
+
 const downloadNext = async () => {
+  if (!isTauri) {
+    listen('download-queue-state', event => applyServerState(event.payload))
+    applyServerState(await invoke('get_download_queue'))
+    return
+  }
+
   while (true) {
     if (downloadQueue.value.length === 0) {
       await delay(1000)
@@ -136,6 +154,13 @@ const addToQueue = (trackIds, autoExport = null) => {
   const snapshot = autoExport ? Object.freeze({ ...autoExport }) : null
   isDownloading.value = true
 
+  if (!isTauri) {
+    // Shown right away; the server's next state update replaces it
+    totalCount.value += trackIds.length
+    invoke('queue_downloads', { trackIds, autoExport: snapshot })
+    return
+  }
+
   for (let i = 0; i < trackIds.length; i++) {
     downloadQueue.value.push({ trackId: trackIds[i], autoExport: snapshot })
   }
@@ -155,6 +180,10 @@ const startOver = () => {
   isDownloading.value = false
   cooldownUntil.value = 0
   cooldownRemaining.value = 0
+
+  if (!isTauri) {
+    invoke('reset_download_queue')
+  }
 }
 
 const stopDownloading = () => {

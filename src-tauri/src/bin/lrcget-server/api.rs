@@ -78,6 +78,14 @@ macro_rules! server_dispatch {
 
 for_each_command!(server_dispatch);
 
+fn parse_args<T: serde::de::DeserializeOwned>(
+    command: &str,
+    args: Value,
+) -> Result<T, CommandError> {
+    serde_json::from_value(args)
+        .map_err(|err| CommandError::BadRequest(format!("Invalid arguments for {command}: {err}")))
+}
+
 /// Commands that take a file path argument, which must stay inside `LRCGET_ROOT`.
 const FILE_PATH_COMMANDS: &[&str] = &["read_text_file", "get_audio_metadata"];
 
@@ -114,6 +122,42 @@ pub async fn invoke(
             Value::Null
         }
         "drain_notifications" => serde_json::to_value(commands::drain_notifications(ctx))?,
+        // Bulk download/export queues run on the server (see jobs.rs).
+        "queue_downloads" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                track_ids: Vec<i64>,
+                auto_export: Option<commands::AutoExportOptions>,
+            }
+            let Args {
+                track_ids,
+                auto_export,
+            } = parse_args(&command, args)?;
+            server.jobs.queue_downloads(track_ids, auto_export);
+            Value::Null
+        }
+        "get_download_queue" => serde_json::to_value(server.jobs.download_snapshot())?,
+        "reset_download_queue" => {
+            server.jobs.reset_downloads();
+            Value::Null
+        }
+        "queue_exports" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                track_ids: Vec<i64>,
+                formats: Vec<commands::ExportLyricsFormat>,
+            }
+            let Args { track_ids, formats } = parse_args(&command, args)?;
+            server.jobs.queue_exports(track_ids, formats);
+            Value::Null
+        }
+        "get_export_queue" => serde_json::to_value(server.jobs.export_snapshot())?,
+        "reset_export_queue" => {
+            server.jobs.reset_exports();
+            Value::Null
+        }
         "play_track" | "pause_track" | "resume_track" | "seek_track" | "stop_track"
         | "set_playback_speed" | "open_devtools" => {
             return Err(CommandError::NotFound(format!(

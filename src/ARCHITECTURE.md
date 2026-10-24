@@ -122,6 +122,7 @@ Shared fields are `export_txt`, `export_lrc`, and `export_embedded`. `auto_expor
 - Requests are spaced by **500 ms + 0–250 ms jitter** to stay under LRCLIB's per-IP rate limit.
 - On failure, `download_lyrics` rejects with a structured error object (`kind`, `message`, `retryAfterSecs`, `scope`).
 - On a rate-limit/server-overload error with `retryAfterSecs`, the queue pauses before the next track and `DownloadViewer.vue` shows a countdown. The Rust client also enforces its own cooldown, so the frontend pause is a UI/queue-level complement rather than the sole guard.
+- **Browser (`lrcget-server`):** the bulk download and export queues run on the server instead (`src-tauri/src/bin/lrcget-server/jobs.rs`), because browsers throttle timers in background tabs. `addToQueue`/`startOver` call `queue_downloads`/`reset_download_queue` (`queue_exports`/`reset_export_queue`), and `downloadNext()`/`exportNext()` load the current state and then mirror the server's `download-queue-state`/`export-queue-state` events into the same refs. Every open tab shows the same queue, and it keeps running when the browser is closed.
 
 ### Edit/Publish Details
 

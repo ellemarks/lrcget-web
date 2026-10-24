@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { invoke } from '@/platform'
 
-vi.mock('@/platform', () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }))
+vi.mock('@/platform', () => ({
+  invoke: vi.fn(),
+  listen: vi.fn(async () => () => {}),
+  isTauri: true,
+}))
 vi.mock('../components/library/MiniSearch.vue', () => ({ default: {} }))
 
 beforeEach(() => {

@@ -39,6 +39,7 @@ src-tauri/
 │   │   ├── main.rs          # Config (env vars), router, static frontend, shutdown
 │   │   ├── api.rs           # POST /api/invoke/{command}, GET /api/events (WebSocket), GET /api/info
 │   │   ├── files.rs         # GET /api/fs (path picker), GET /api/audio (range streaming), LRCGET_ROOT guard
+│   │   ├── jobs.rs          # Server-side bulk download/export queues
 │   │   ├── transcode.rs     # Symphonia → cached WAV for formats browsers can't decode
 │   │   └── auth.rs          # Optional HTTP basic auth
 │   ├── state.rs             # AppState, ServiceAccess trait
@@ -360,6 +361,7 @@ Serves the built frontend (`LRCGET_WEB_DIR`, SPA fallback to `index.html`) and e
 - **`LRCGET_ROOT`:** `/api/fs`, `/api/audio`, `read_text_file` and `get_audio_metadata` only accept paths that canonicalize (following symlinks) to somewhere under it. Defaults to `/`; the Docker image sets `/music`.
 - **Auth:** with `LRCGET_USERNAME` and `LRCGET_PASSWORD` set, every request needs HTTP basic auth (browsers reuse it for `<audio>` and the WebSocket). The server warns at startup when bound to a non-loopback address without credentials.
 - **`set_volume`** only persists the volume; playback commands (`play_track`, `pause_track`, ...) are not available.
+- **Bulk queues (`jobs.rs`):** the desktop app runs Download/Export batches as loops in the frontend; in a browser those stall in background tabs, so the server runs them instead. Extra commands: `queue_downloads(trackIds, autoExport?)`, `get_download_queue()`, `reset_download_queue()`, `queue_exports(trackIds, formats)`, `get_export_queue()`, `reset_export_queue()`. Each worker is a Tokio task fed by a `Notify`. The download worker keeps the frontend's spacing (500 ms + 0–250 ms jitter) and pauses on `rateLimited`/`serverOverloaded` errors for `retryAfterSecs`. Every change broadcasts a full snapshot (`download-queue-state` / `export-queue-state`: counts, `cooldownRemaining`, last 100 log entries). Resetting bumps a generation counter, so a request that was already in flight isn't counted in the next batch.
 - **Docker:** root `Dockerfile` (Node 24 frontend build → `cargo build --release --features server` → `debian:bookworm-slim` runtime as UID 1000) and an example `docker-compose.yml`.
 
 ## WebDriver Dev Bridge (`tauri-plugin-webdriver`)

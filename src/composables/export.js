@@ -1,5 +1,5 @@
 import { computed, markRaw, ref } from 'vue'
-import { invoke } from '@/platform'
+import { invoke, isTauri, listen } from '@/platform'
 
 const delay = time => new Promise(resolve => setTimeout(resolve, time))
 
@@ -87,7 +87,23 @@ const exportTrack = async (track, formats) => {
   }
 }
 
+// Browser: the server runs the queue (see downloader.js) and broadcasts its state.
+const applyServerState = state => {
+  isExporting.value = state.isExporting
+  totalCount.value = state.totalCount
+  exportedCount.value = state.exportedCount
+  skippedCount.value = state.skippedCount
+  errorCount.value = state.errorCount
+  log.value = state.log.map(entry => markRaw(entry))
+}
+
 const exportNext = async () => {
+  if (!isTauri) {
+    listen('export-queue-state', event => applyServerState(event.payload))
+    applyServerState(await invoke('get_export_queue'))
+    return
+  }
+
   while (true) {
     if (exportQueue.value.length === 0) {
       await delay(1000)
@@ -135,6 +151,13 @@ const addToQueue = (trackIds, formats) => {
     ...(formats.embedIntoTrack ? ['embedded'] : []),
   ])
 
+  if (!isTauri) {
+    // Shown right away; the server's next state update replaces it
+    totalCount.value += trackIds.length
+    invoke('queue_exports', { trackIds, formats: snapshot })
+    return
+  }
+
   for (let i = 0; i < trackIds.length; i++) {
     exportQueue.value.push({ trackId: trackIds[i], formats: snapshot })
   }
@@ -152,6 +175,10 @@ const startOver = () => {
   errorCount.value = 0
   totalCount.value = 0
   isExporting.value = false
+
+  if (!isTauri) {
+    invoke('reset_export_queue')
+  }
 }
 
 const stopExporting = () => {
