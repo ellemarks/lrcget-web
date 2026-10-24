@@ -15,7 +15,7 @@ use lrcget_lib::commands::{Ctx, EventSink};
 use lrcget_lib::db;
 use lrcget_lib::state::AppState;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tower_http::services::{ServeDir, ServeFile};
@@ -138,6 +138,10 @@ async fn main() {
         }
     };
 
+    if let Err(err) = check_data_dir_writable(&config.data_dir) {
+        eprintln!("{err}");
+        std::process::exit(1);
+    }
     let db = db::initialize_database(&config.data_dir).expect("Database initialize should succeed");
     let (events, _) = broadcast::channel(1024);
     let ctx = Ctx::new(
@@ -199,6 +203,49 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("Server error");
+}
+
+/// Fails with an actionable message when the data directory can't be written, the usual cause
+/// being a Docker bind mount that Docker created as root.
+fn check_data_dir_writable(data_dir: &Path) -> Result<(), String> {
+    let probe = data_dir.join(".write-test");
+    let result = std::fs::create_dir_all(data_dir)
+        .and_then(|_| std::fs::write(&probe, b""))
+        .and_then(|_| std::fs::remove_file(&probe));
+    let Err(err) = result else {
+        return Ok(());
+    };
+
+    let mut message = format!(
+        "Cannot write to the data directory {} ({err}).",
+        data_dir.display()
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let process_uid = std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|status| {
+                status
+                    .lines()
+                    .find_map(|line| line.strip_prefix("Uid:"))
+                    .and_then(|ids| ids.split_whitespace().next().map(str::to_owned))
+            });
+        if let (Some(uid), Ok(metadata)) = (process_uid, std::fs::metadata(data_dir)) {
+            message.push_str(&format!(
+                "\nLRCGET runs as UID {uid}, but the directory is owned by UID {}:{}.",
+                metadata.uid(),
+                metadata.gid()
+            ));
+        }
+    }
+    message.push_str(
+        "\nIf it is a Docker bind mount, create the host directory yourself before starting the \
+         container (Docker creates missing ones as root), or give it to the container's user, \
+         e.g. `sudo chown 1000:1000 ./data`. Otherwise set LRCGET_DATA_DIR to a writable \
+         directory.",
+    );
+    Err(message)
 }
 
 async fn shutdown_signal() {

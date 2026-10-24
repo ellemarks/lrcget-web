@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# lrcget-server (Docker Compose)
+.env
+/data

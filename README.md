@@ -43,11 +43,11 @@ LRCGET can also run as a web server, for example on a NAS next to your music, an
 With Docker Compose (see [`docker-compose.yml`](docker-compose.yml)):
 
 ```shell
-# edit docker-compose.yml: music path, user, password
+cp .env.example .env   # set LRCGET_MUSIC_DIR, LRCGET_PASSWORD and the UID/GID that own your music
 docker compose up -d --build
 ```
 
-Then open `http://<server>:3000` and add folders under `/music`.
+Then open `http://<server>:3000` and add folders under `/music`. The database is kept in the `lrcget-data` Docker volume. If you'd rather bind-mount a host folder to `/data`, create it first and make sure it is owned by `LRCGET_UID`; a folder that Docker creates for you is owned by root, and the server can't write to it.
 
 The server is configured with environment variables:
 

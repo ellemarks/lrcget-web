@@ -4,3 +4,5 @@ src-tauri/target
 src-tauri/gen
 .git
 screenshots
+data
+.env
