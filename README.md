@@ -40,12 +40,14 @@ Mac Apple Silicon: [LRCGET_2.2.0_aarch64.dmg](https://github.com/tranxuanthang/l
 
 LRCGET can also run as a web server, for example on a NAS next to your music, and be used from any browser. The same app is served over HTTP: the library, scanning, downloading, editing and publishing all work as in the desktop app. Audio plays in your browser, streamed from the server. Formats the browser can't play, such as ALAC, are converted on the server.
 
-With Docker Compose (see [`docker-compose.yml`](docker-compose.yml)):
+A prebuilt image is published as `ghcr.io/ellemarks/lrcget-web` (amd64). With Docker Compose, you only need [`docker-compose.yml`](docker-compose.yml) and [`.env.example`](.env.example) from this repository:
 
 ```shell
 cp .env.example .env   # set LRCGET_MUSIC_DIR, LRCGET_PASSWORD and the UID/GID that own your music
-docker compose up -d --build
+docker compose up -d
 ```
+
+To update, run `docker compose pull && docker compose up -d`. To build the image from a checkout instead, use `docker compose up -d --build`.
 
 Then open `http://<server>:3000` and add folders under `/music`. The database is kept in the `lrcget-data` Docker volume. If you'd rather bind-mount a host folder to `/data`, create it first and make sure it is owned by `LRCGET_UID`; a folder that Docker creates for you is owned by root, and the server can't write to it.
 

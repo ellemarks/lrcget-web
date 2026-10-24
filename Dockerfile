@@ -26,6 +26,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 # --- Runtime ---
 FROM debian:bookworm-slim
+# Links the published image (ghcr.io/ellemarks/lrcget-web) to its repository
+LABEL org.opencontainers.image.source="https://github.com/ellemarks/lrcget-web" \
+      org.opencontainers.image.description="LRCGET as a self-hosted web app" \
+      org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data /music \
