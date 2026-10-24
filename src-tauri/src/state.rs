@@ -1,8 +1,4 @@
 use rusqlite::Connection;
-use tauri::{AppHandle, Manager, State};
-
-use crate::player::Player;
-
 use serde::Serialize;
 
 #[derive(Clone, Serialize)]
@@ -28,8 +24,23 @@ pub struct Notify {
 
 pub struct AppState {
     pub db: std::sync::Mutex<Option<Connection>>,
-    pub player: std::sync::Mutex<Option<Player>>,
     pub queued_notifications: std::sync::Mutex<Vec<Notify>>,
+}
+
+impl AppState {
+    pub fn new(db: Connection) -> Self {
+        Self {
+            db: std::sync::Mutex::new(Some(db)),
+            queued_notifications: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn notify(&self, message: String, notify_type: NotifyType) {
+        self.queued_notifications
+            .lock()
+            .unwrap()
+            .push(Notify { message, notify_type });
+    }
 }
 
 pub trait ServiceAccess {
@@ -42,13 +53,12 @@ pub trait ServiceAccess {
         F: FnOnce(&mut Connection) -> TResult;
 }
 
-impl ServiceAccess for AppHandle {
+impl ServiceAccess for AppState {
     fn db<F, TResult>(&self, operation: F) -> TResult
     where
         F: FnOnce(&Connection) -> TResult,
     {
-        let app_state: State<AppState> = self.state();
-        let db_connection_guard = app_state.db.lock().unwrap();
+        let db_connection_guard = self.db.lock().unwrap();
         let db = db_connection_guard.as_ref().unwrap();
 
         operation(db)
@@ -58,8 +68,7 @@ impl ServiceAccess for AppHandle {
     where
         F: FnOnce(&mut Connection) -> TResult,
     {
-        let app_state: State<AppState> = self.state();
-        let mut db_connection_guard = app_state.db.lock().unwrap();
+        let mut db_connection_guard = self.db.lock().unwrap();
         let db = db_connection_guard.as_mut().unwrap();
 
         operation(db)

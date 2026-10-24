@@ -1,6 +1,9 @@
 <template>
   <div class="h-screen w-screen flex flex-col select-none">
-    <div class="fixed top-0 left-0 flex justify-end items-start text-sm flex-none z-50">
+    <div
+      v-if="isTauri"
+      class="fixed top-0 left-0 flex justify-end items-start text-sm flex-none z-50"
+    >
       <div
         class="p-0.5 m-1 rounded-full text-sm text-hoa-1400 hover:bg-hoa-600 active:bg-hoa-800 transition"
         @click="openDevtools"
@@ -25,18 +28,16 @@
   </div>
 
   <ModalsContainer />
+  <ServerPathPicker v-if="!isTauri" />
 </template>
 
 <script setup>
 import Bug from '~icons/mdi/bug'
-import WindowMinimize from '~icons/mdi/window-minimize'
-import WindowMaximize from '~icons/mdi/window-maximize'
-import WindowClose from '~icons/mdi/window-close'
 import ChooseDirectory from './components/ChooseDirectory.vue'
 import Library from './components/Library.vue'
+import ServerPathPicker from './components/common/ServerPathPicker.vue'
 import { ref, onMounted, watch } from 'vue'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { invoke } from '@tauri-apps/api/core'
+import { getSystemTheme, invoke, isTauri, onSystemThemeChanged } from '@/platform'
 import { ModalsContainer } from 'vue-final-modal'
 import { useGlobalState } from './composables/global-state'
 import { useDownloader } from '@/composables/downloader.js'
@@ -44,7 +45,6 @@ import { useExporter } from '@/composables/export.js'
 import { usePlayer } from '@/composables/player.js'
 import { useToast } from 'vue-toastification'
 
-const appWindow = getCurrentWebviewWindow()
 const toast = useToast()
 const { themeMode, setThemeMode, setLrclibInstance } = useGlobalState()
 const { downloadNext } = useDownloader()
@@ -103,6 +103,10 @@ const loadGlobalState = async () => {
 }
 
 const drainNotifications = async () => {
+  // Only the desktop app queues notifications (e.g. audio device errors)
+  if (!isTauri) {
+    return
+  }
   setInterval(async () => {
     const notifications = await invoke('drain_notifications')
     notifications.forEach(notification => {
@@ -115,7 +119,7 @@ const drainNotifications = async () => {
 
 const darkModeHandle = async themeMode => {
   if (themeMode !== 'dark' && themeMode !== 'light') {
-    themeMode = await appWindow.theme()
+    themeMode = await getSystemTheme()
   }
   // check and insert the `dark` class to html tag
   if (themeMode === 'dark') {
@@ -129,19 +133,7 @@ const openDevtools = () => {
   invoke('open_devtools')
 }
 
-const minimizeWindow = () => {
-  appWindow.minimize()
-}
-
-const maximizeWindow = () => {
-  appWindow.toggleMaximize()
-}
-
-const closeWindow = () => {
-  appWindow.close()
-}
-
-appWindow.onThemeChanged(({ payload: theme }) => {
+onSystemThemeChanged(theme => {
   if (themeMode.value === 'auto') {
     darkModeHandle(theme)
   }

@@ -36,7 +36,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { useToast } from 'vue-toastification'
 import BaseModal from '@/components/common/BaseModal.vue'
 import Loading from '~icons/mdi/loading'

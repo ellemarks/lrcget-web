@@ -157,7 +157,7 @@
 </template>
 
 <script setup>
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { computed, ref, onMounted } from 'vue'
 import Loading from '~icons/mdi/loading'
 import Eye from '~icons/mdi/eye'

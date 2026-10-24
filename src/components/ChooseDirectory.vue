@@ -39,9 +39,7 @@
 </template>
 
 <script setup>
-import { open } from '@tauri-apps/plugin-dialog'
-import { audioDir } from '@tauri-apps/api/path'
-import { invoke } from '@tauri-apps/api/core'
+import { getDefaultMusicDir, invoke, open } from '@/platform'
 import { ref, onMounted } from 'vue'
 import Close from '~icons/mdi/close'
 import Plus from '~icons/mdi/plus'
@@ -70,9 +68,11 @@ onMounted(async () => {
     directories.value = [...directoriesFromDB]
     originalDirectories.value = [...directoriesFromDB]
   } else {
-    const dirPath = await audioDir()
-    directories.value.push(dirPath)
-    originalDirectories.value = [dirPath]
+    const dirPath = await getDefaultMusicDir()
+    if (dirPath) {
+      directories.value.push(dirPath)
+      originalDirectories.value = [dirPath]
+    }
   }
 })
 

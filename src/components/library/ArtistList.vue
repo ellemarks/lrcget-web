@@ -37,7 +37,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import ArtistItem from './artist-list/ArtistItem.vue'
 import ArtistTrackList from './artist-list/ArtistTrackList.vue'
 import { useSearchLibrary } from '@/composables/search-library.js'

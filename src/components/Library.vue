@@ -50,8 +50,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { invoke, listen } from '@/platform'
 import Loading from '~icons/mdi/loading'
 import _ from 'lodash'
 import LibraryHeader from './library/LibraryHeader.vue'

@@ -1,5 +1,5 @@
 import { computed, ref, shallowRef, watch, onBeforeUnmount } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { useExportPreferences } from './export-preferences.js'
 import { useDownloader } from './downloader.js'
 import { downloadModeFromConfig, downloadFlagsForMode } from '@/utils/download-filter.js'

@@ -78,10 +78,9 @@
 </template>
 
 <script setup>
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, listen } from '@/platform'
 import { ref, onMounted, watch } from 'vue'
 import Loading from '~icons/mdi/loading'
-import { listen } from '@tauri-apps/api/event'
 import { useToast } from 'vue-toastification'
 
 const toast = useToast()

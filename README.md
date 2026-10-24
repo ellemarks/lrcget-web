@@ -36,6 +36,42 @@ Mac x64 (Intel): [LRCGET_2.2.0_x64.dmg](https://github.com/tranxuanthang/lrcget/
 
 Mac Apple Silicon: [LRCGET_2.2.0_aarch64.dmg](https://github.com/tranxuanthang/lrcget/releases/download/2.2.0/LRCGET_2.2.0_aarch64.dmg)
 
+## Self-hosting the web version
+
+LRCGET can also run as a web server, for example on a NAS next to your music, and be used from any browser. The same app is served over HTTP: the library, scanning, downloading, editing and publishing all work as in the desktop app. Audio plays in your browser, streamed from the server. Formats the browser can't play, such as ALAC, are converted on the server.
+
+With Docker Compose (see [`docker-compose.yml`](docker-compose.yml)):
+
+```shell
+# edit docker-compose.yml: music path, user, password
+docker compose up -d --build
+```
+
+Then open `http://<server>:3000` and add folders under `/music`.
+
+The server is configured with environment variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LRCGET_BIND` | `127.0.0.1:3000` (`0.0.0.0:3000` in Docker) | Listen address |
+| `LRCGET_DATA_DIR` | `~/.local/share/lrcget-server` (`/data` in Docker) | Database and transcoding cache |
+| `LRCGET_ROOT` | `/` (`/music` in Docker) | Only files and folders below this path can be browsed, scanned or played |
+| `LRCGET_MUSIC_DIR` | `LRCGET_ROOT`, or `~/Music` | Folder suggested when setting up a library |
+| `LRCGET_USERNAME`, `LRCGET_PASSWORD` | unset | Require HTTP basic auth |
+| `LRCGET_WEB_DIR` | `dist/` next to the binary | Built frontend |
+
+The web server has no user accounts. Anyone who can reach it can browse `LRCGET_ROOT`, change lyrics files, and publish to LRCLIB. Set `LRCGET_USERNAME`/`LRCGET_PASSWORD`, or put it behind a reverse proxy that handles authentication, before exposing it beyond localhost. Use HTTPS if you want *Paste LRC* to read your clipboard; browsers only allow that on secure origins.
+
+Without Docker:
+
+```shell
+npm install
+npm run build
+cd src-tauri
+cargo build --release --bin lrcget-server --no-default-features --features server
+LRCGET_WEB_DIR=../dist ./target/release/lrcget-server
+```
+
 ## Screenshots
 
 ![01.png](https://raw.githubusercontent.com/tranxuanthang/lrcget/9e0578bd9411fcc024a56d2f1108701751c5ec3a/screenshots/01.png)
@@ -121,6 +157,13 @@ Start the development window with the following command:
 cd lrcget
 npm install
 npm run tauri dev
+```
+
+To work on the web version, run the server and the Vite dev server (which forwards `/api` to it) side by side, then open http://localhost:1420:
+
+```shell
+cd src-tauri && cargo run --bin lrcget-server --no-default-features --features server
+npm run dev
 ```
 
 ## Building

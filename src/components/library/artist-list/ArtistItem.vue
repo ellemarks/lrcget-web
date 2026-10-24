@@ -34,7 +34,7 @@
 <script setup>
 import DownloadMultiple from '~icons/mdi/download-multiple'
 import { ref, onMounted, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { useDownloadTrigger } from '@/composables/download-options.js'
 
 const props = defineProps(['artistId'])

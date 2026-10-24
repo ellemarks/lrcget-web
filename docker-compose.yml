@@ -1,0 +1,20 @@
+# Example deployment of the LRCGET web server. Start with `docker compose up -d --build`
+# and open http://<host>:3000
+services:
+  lrcget:
+    build: .
+    image: lrcget-web
+    container_name: lrcget
+    restart: unless-stopped
+    # Run as the user that owns your music, so LRCGET can write .lrc files next to it
+    user: "1000:1000"
+    ports:
+      - "3000:3000"
+    environment:
+      # Strongly recommended unless a reverse proxy already handles authentication
+      LRCGET_USERNAME: lrcget
+      LRCGET_PASSWORD: change-me
+    volumes:
+      - ./data:/data
+      # Everything under /music can be browsed, scanned and played
+      - /path/to/your/music:/music

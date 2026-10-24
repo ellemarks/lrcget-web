@@ -123,7 +123,7 @@
 </template>
 
 <script setup>
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { ref, watch } from 'vue'
 import { useGlobalState } from '../../composables/global-state'
 import { usePlayer } from '@/composables/player.js'

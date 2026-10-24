@@ -2,7 +2,22 @@
 
 ## Architecture Overview
 
-Vue 3 frontend in Tauri webview. Handles UI, playback, library browsing, lyric editing, and backend communication. Session state only; persistence in Rust/SQLite.
+Vue 3 frontend, running either in the Tauri webview (desktop) or in a regular browser served by `lrcget-server` (web). Handles UI, playback, library browsing, lyric editing, and backend communication. Session state only; persistence in Rust/SQLite.
+
+**Platform layer** (`src/platform/`): components import backend access from `@/platform`, never from `@tauri-apps/*`. `isTauri` (`'__TAURI_INTERNALS__' in window`) picks the implementation at runtime:
+
+| Export | Desktop (Tauri) | Browser (`lrcget-server`) |
+|--------|-----------------|---------------------------|
+| `invoke(cmd, args)` | Tauri IPC | `POST api/invoke/{cmd}`; rejects with the JSON error body |
+| `listen(event, handler)` | Tauri events | One shared, auto-reconnecting WebSocket on `api/events` |
+| `open(options)` | Native dialog | `ServerPathPicker.vue` browsing the server via `api/fs` (mounted in `App.vue`) |
+| `pickLocalTextFile(accept)` | – | `<input type=file>` on the user's device (LRC import) |
+| `readClipboardText()` | Clipboard plugin | `navigator.clipboard` (HTTPS or localhost only) |
+| `getVersion()`, `getDefaultMusicDir()` | Tauri app/path APIs | `api/info` |
+| `getSystemTheme()`, `onSystemThemeChanged()` | Window theme | `prefers-color-scheme` |
+| `audioUrl(track, { transcode })` | – | `api/audio` URL for the browser player |
+
+`npm run dev` proxies `/api` (including WebSockets) to `LRCGET_SERVER_URL` (default `http://127.0.0.1:3000`), so browser development runs against `lrcget-server`. Tests mock `@/platform`.
 
 **Tech Stack**: Vue 3 (`<script setup>`), Vite, Tailwind CSS, Vue Final Modal, Floating Vue, Vue Toastification, TanStack Vue Virtual, CodeMirror, `unplugin-icons` + Iconify Material Design Icons (`@iconify-json/mdi`).
 
@@ -31,6 +46,7 @@ src/
 │   ├── library/            # Library views + lyric edit/search
 │   └── now-playing/        # Playback controls
 ├── composables/            # Shared state (player, downloader, search, edit)
+├── platform/               # Tauri vs. browser backend access (see above)
 └── utils/                  # Helpers (lyrics, durations, linting)
 ```
 
@@ -166,6 +182,8 @@ The player supports two types of tracks via a unified `PlayableTrack` type:
 
 - If `track.id` is present → Database track, fetches full data from SQLite
 - If only `track.file_path` is present → File-based track, metadata extracted from file or provided directly
+
+**Desktop vs. browser playback:** under Tauri, these calls go to the Kira player in Rust, which reports `player-state` every 40ms. In the browser, `player.js` drives an `<audio>` element streaming `api/audio` instead and updates the same refs (`status`, `progress`, `duration`, `volume`, `playbackSpeed`) itself, polling `currentTime` every 40ms while playing. Semantics match the desktop player (seeking starts playback; seeking after `stop()` reloads the track). If the browser reports the format as unsupported or undecodable, it retries once with `transcode=true` (server-side WAV). `setVolume` still calls `set_volume` so the volume persists in the config.
 
 This enables the V2 lyrics editor to support playback for:
 

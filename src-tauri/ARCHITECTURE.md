@@ -2,28 +2,45 @@
 
 ## Architecture Overview
 
-**Stack:** Tauri v2 (Rust) + SQLite + Kira audio + LRCLIB API
+**Stack:** Tauri v2 (Rust) + SQLite + Kira audio + LRCLIB API, plus an optional axum web server
+
+The crate builds a library (`lrcget_lib`, everything except the binaries) and two binaries behind Cargo features:
+
+| Binary | Feature | Entry | Frontend transport | Audio |
+|--------|---------|-------|--------------------|-------|
+| `lrcget` (desktop, default) | `desktop` (default) | `src/main.rs` | Tauri IPC | Kira, on the machine running LRCGET |
+| `lrcget-server` | `server` | `src/bin/lrcget-server/` | HTTP + WebSocket | `<audio>` in the browser, streamed from the server |
+
+Tauri, its plugins and Kira are optional dependencies enabled by `desktop`, so the server builds without WebKitGTK/ALSA: `cargo build --bin lrcget-server --no-default-features --features server`. `build.rs` only runs `tauri_build` when `desktop` is enabled.
 
 **Patterns:**
 | Pattern | Implementation |
 |---------|---------------|
-| State | Global `AppState` with `Mutex<Connection>` and `Mutex<Player>` |
-| DB Access | `ServiceAccess` trait on `AppHandle` for read/write operations |
-| Events | Async backend→frontend via `app.emit()` |
-| Commands | All FFI in `main.rs`, organized by domain |
+| State | `AppState` with `Mutex<Connection>` and queued notifications; the desktop binary keeps `Mutex<Player>` in its own `DesktopState` |
+| DB Access | `ServiceAccess` trait on `AppState` (`ctx.db(...)`, `ctx.db_mut(...)`) |
+| Events | `Ctx::emit()` → `EventSink` (Tauri `app.emit()` on desktop, WebSocket broadcast on the server) |
+| Commands | Implemented once in `commands.rs` as `async fn(ctx: &Ctx, ...)`; listed in `for_each_command!`, from which both binaries generate their wrappers |
 | Scanning | Single-pass streaming with batch processing (100 files) |
 | Export | Optional TXT/LRC/embedded export after library/album/artist bulk Download; shared manual writers |
 
 **Key Dependencies:** `tauri`, `rusqlite`+`rusqlite_migration`, `lofty`, `kira`, `reqwest`, `rayon`, `xxhash-rust`, `regex` (for LRC parsing), `charabia` (international word segmentation), `fastrand` (retry jitter)
 
-**Word Segmentation Command:** `segment_words(text)` in `main.rs` uses Charabia's segmenter (`Segment::segment_str`) and then applies language-agnostic post-processing: segments containing at least one letter/number are kept as tokens, while separator-only segments (spaces/punctuation/symbols) are merged into adjacent tokens.
+**Word Segmentation Command:** `segment_words(text)` in `commands.rs` uses Charabia's segmenter (`Segment::segment_str`) and then applies language-agnostic post-processing: segments containing at least one letter/number are kept as tokens, while separator-only segments (spaces/punctuation/symbols) are merged into adjacent tokens.
 
 ## Project Structure
 
 ```
 src-tauri/
 ├── src/
-│   ├── main.rs              # Entry point, Tauri commands, WebDriver plugin wiring
+│   ├── lib.rs               # lrcget_lib: module list shared by both binaries
+│   ├── main.rs              # Desktop entry point: Tauri command wrappers, Kira player commands, WebDriver plugin wiring
+│   ├── commands.rs          # Command implementations (Ctx, EventSink, for_each_command! list)
+│   ├── bin/lrcget-server/   # Web server binary (feature `server`)
+│   │   ├── main.rs          # Config (env vars), router, static frontend, shutdown
+│   │   ├── api.rs           # POST /api/invoke/{command}, GET /api/events (WebSocket), GET /api/info
+│   │   ├── files.rs         # GET /api/fs (path picker), GET /api/audio (range streaming), LRCGET_ROOT guard
+│   │   ├── transcode.rs     # Symphonia → cached WAV for formats browsers can't decode
+│   │   └── auth.rs          # Optional HTTP basic auth
 │   ├── state.rs             # AppState, ServiceAccess trait
 │   ├── db.rs                # SQLite operations, migrations
 │   ├── library.rs           # High-level library API
@@ -54,20 +71,34 @@ src-tauri/
 
 ## Core Components
 
-### State Management (`state.rs`)
+### State Management (`state.rs`, `commands.rs`)
 
 ```rust
 struct AppState {
     db: Mutex<Option<Connection>>,           // SQLite
-    player: Mutex<Option<Player>>,           // Kira audio
     queued_notifications: Mutex<Vec<Notify>>,
 }
 
-trait ServiceAccess {
+trait ServiceAccess {                    // implemented for AppState
     fn db<F, T>(&self, f: F) -> T;      // Read-only
     fn db_mut<F, T>(&self, f: F) -> T;  // Mutable
 }
+
+#[derive(Clone)]
+struct Ctx {                             // handed to every command, derefs to AppState
+    state: Arc<AppState>,
+    events: Arc<dyn EventSink>,          // fn emit_value(&self, event: &str, payload: Value)
+}
 ```
+
+`db::initialize_database(app_dir)` takes the data directory: the desktop app passes Tauri's `app_data_dir`, the server `LRCGET_DATA_DIR`.
+
+### Adding a command
+
+1. Implement `pub async fn name(ctx: &Ctx, arg: Type, ...) -> Result<T, E>` in `commands.rs` (argument names become the frontend's camelCase `invoke` keys).
+2. Add `name(arg: Type, ...) -> Result<T, E>;` to `for_each_command!` at the bottom of `commands.rs`, using `$crate::` paths for crate types.
+
+Both the Tauri handler and the server's dispatch table are generated from that list. Desktop-only commands (Kira playback, `open_devtools`) live in `main.rs`; the server answers them with 404.
 
 ### Database Schema (v10)
 
@@ -177,6 +208,8 @@ struct Player {
 ```
 
 The player uses `PlayableTrack` to support both library tracks (from database) and arbitrary tracks (from file picker). This enables playback of tracks not present in the library database.
+
+Desktop only (feature `desktop`, managed as `DesktopState` in `main.rs`). In the web version the browser plays audio itself (see the web server section below and `src/composables/player.js`).
 
 Background loop (40ms) in `main.rs` emits `player-state` event.
 
@@ -312,6 +345,23 @@ Implements `From<PersistentTrack>` for seamless conversion from database entitie
 
 **PersistentConfig:** skip_synced, skip_plain, show_line_count, try_embed, theme_mode, lrclib_instance, volume, auto_export_enabled, export_lrc, export_txt, export_embedded
 
+## Web Server (`src/bin/lrcget-server/`)
+
+Serves the built frontend (`LRCGET_WEB_DIR`, SPA fallback to `index.html`) and exposes the shared commands so LRCGET can run headless and be used from any browser. Configured with environment variables (`lrcget-server --help`): `LRCGET_BIND`, `LRCGET_DATA_DIR`, `LRCGET_WEB_DIR`, `LRCGET_ROOT`, `LRCGET_MUSIC_DIR`, `LRCGET_USERNAME`/`LRCGET_PASSWORD`.
+
+| Route | Purpose |
+|-------|---------|
+| `POST /api/invoke/{command}` | JSON object of camelCase args → JSON result. Errors return the command's error value as JSON (400), so the frontend rejects exactly like Tauri's `invoke`. Bad args 422, unknown command 404 |
+| `GET /api/events` | WebSocket; every `Ctx::emit` is broadcast to all clients as `{ "event", "payload" }` |
+| `GET /api/info` | `{ version, root, musicDir }` (replaces Tauri's `getVersion` / `audioDir`) |
+| `GET /api/fs?path=&files=&extensions=` | Directory listing for the browser path picker |
+| `GET /api/audio?trackId=` or `?path=` (`&transcode=true`) | Audio file with HTTP range support; `transcode` decodes with Symphonia into a cached 16-bit WAV (`<data dir>/transcode-cache`, newest 10 kept) for formats the browser can't play, e.g. ALAC |
+
+- **`LRCGET_ROOT`:** `/api/fs`, `/api/audio`, `read_text_file` and `get_audio_metadata` only accept paths that canonicalize (following symlinks) to somewhere under it. Defaults to `/`; the Docker image sets `/music`.
+- **Auth:** with `LRCGET_USERNAME` and `LRCGET_PASSWORD` set, every request needs HTTP basic auth (browsers reuse it for `<audio>` and the WebSocket). The server warns at startup when bound to a non-loopback address without credentials.
+- **`set_volume`** only persists the volume; playback commands (`play_track`, `pause_track`, ...) are not available.
+- **Docker:** root `Dockerfile` (Node 24 frontend build → `cargo build --release --features server` → `debian:bookworm-slim` runtime as UID 1000) and an example `docker-compose.yml`.
+
 ## WebDriver Dev Bridge (`tauri-plugin-webdriver`)
 
 Agent-driven inspection (screenshots, DOM queries, JS eval, interaction, logs) via a [W3C WebDriver](https://www.w3.org/TR/webdriver/) server, provided by [tauri-plugin-webdriver](https://github.com/Choochmeque/tauri-plugin-webdriver).
@@ -384,7 +434,7 @@ Search across all three entity types uses SQLite FTS5 (via `tracks_fts`, `albums
 
 **tauri.conf.json:** Window 1024x768 min, CSP for asset protocol + media
 
-**Cargo.toml:** Rust 2021, Tauri v2 (dialog, shell, global-shortcut, os plugins)
+**Cargo.toml:** Rust 2021, Tauri v2 (dialog, shell, global-shortcut, os plugins), features `desktop` (default) and `server` (axum, tower-http)
 
 ## Track Matching (`find_matching_tracks`)
 
@@ -446,6 +496,8 @@ Run the backend test suite from `src-tauri/`:
 
 ```bash
 cargo test
+# or, without the Tauri system dependencies:
+cargo test --lib --no-default-features
 ```
 
 `lrclib::client` includes in-process HTTP integration tests backed by a raw `TcpListener` mock server. They cover:

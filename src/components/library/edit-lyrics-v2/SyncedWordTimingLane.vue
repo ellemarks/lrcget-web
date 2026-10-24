@@ -156,7 +156,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import Equal from '~icons/mdi/equal'
 import Play from '~icons/mdi/play'
 import Close from '~icons/mdi/close'

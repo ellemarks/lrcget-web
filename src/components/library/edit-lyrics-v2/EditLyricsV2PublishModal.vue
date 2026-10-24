@@ -65,8 +65,7 @@
 </template>
 
 <script setup>
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { invoke, listen } from '@/platform'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Loading from '~icons/mdi/loading'
 import { useToast } from 'vue-toastification'

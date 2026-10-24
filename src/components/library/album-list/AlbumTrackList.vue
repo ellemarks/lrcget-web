@@ -79,7 +79,7 @@ import ArrowLeft from '~icons/mdi/arrow-left'
 import DownloadMultiple from '~icons/mdi/download-multiple'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ref, computed, watch, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import TrackItem from '../track-list/TrackItem.vue'
 import { useDownloadTrigger } from '@/composables/download-options.js'
 

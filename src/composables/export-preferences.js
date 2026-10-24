@@ -1,5 +1,5 @@
 import { readonly, ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 
 const preferences = ref(null)
 

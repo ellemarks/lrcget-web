@@ -19,6 +19,13 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    // Browser development against `lrcget-server` (unused inside Tauri)
+    proxy: {
+      '/api': {
+        target: process.env.LRCGET_SERVER_URL || 'http://127.0.0.1:3000',
+        ws: true,
+      },
+    },
   },
   // to make use of `TAURI_DEBUG` and other env variables
   // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand

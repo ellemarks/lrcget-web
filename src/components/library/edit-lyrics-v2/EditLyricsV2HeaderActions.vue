@@ -117,7 +117,7 @@ import ChevronDown from '~icons/mdi/chevron-down'
 import ContentSave from '~icons/mdi/content-save'
 import Bug from '~icons/mdi/bug'
 import CheckboxButton from '@/components/common/CheckboxButton.vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 
 const emit = defineEmits(['save', 'save-and-publish', 'export', 'debug'])
 

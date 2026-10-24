@@ -41,7 +41,7 @@
 import TrackItem from './track-list/TrackItem.vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { ref, computed, watch, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { useSearchLibrary } from '@/composables/search-library.js'
 
 const props = defineProps(['isActive'])

@@ -159,9 +159,7 @@ import { useEditLyricsV2Export } from '@/composables/edit-lyrics-v2/useEditLyric
 import { useEditLyricsV2SyncedHotkeys } from '@/composables/edit-lyrics-v2/useEditLyricsV2SyncedHotkeys.js'
 import { useGlobalState } from '@/composables/global-state.js'
 import { usePlayer } from '@/composables/player.js'
-import { open } from '@tauri-apps/plugin-dialog'
-import { readText } from '@tauri-apps/plugin-clipboard-manager'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, isTauri, open, pickLocalTextFile, readClipboardText } from '@/platform'
 import { parseLrcLines } from '@/utils/lyricsfile.js'
 
 const props = defineProps({
@@ -341,22 +339,32 @@ const handleUpdateSelectedLineIndices = payload => {
   }
 }
 
+const pickLrcFileContent = async () => {
+  // In the browser, LRC files usually live on the user's own device rather than the server.
+  if (!isTauri) {
+    return pickLocalTextFile('.lrc,text/plain')
+  }
+
+  const filePath = await open({
+    multiple: false,
+    directory: false,
+    filters: [
+      { name: 'LRC Files', extensions: ['lrc'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  })
+
+  return filePath ? invoke('read_text_file', { filePath }) : null
+}
+
 const handleImportLrcFile = async () => {
   try {
-    const filePath = await open({
-      multiple: false,
-      directory: false,
-      filters: [
-        { name: 'LRC Files', extensions: ['lrc'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    })
+    const content = await pickLrcFileContent()
 
-    if (!filePath) {
+    if (content === null) {
       return
     }
 
-    const content = await invoke('read_text_file', { filePath })
     const parsedLines = parseLrcLines(content)
 
     if (parsedLines.length === 0) {
@@ -374,7 +382,7 @@ const handleImportLrcFile = async () => {
 
 const handlePasteLrc = async () => {
   try {
-    const text = await readText()
+    const text = await readClipboardText()
     if (!text || !text.trim()) {
       toast.error('Clipboard is empty')
       return

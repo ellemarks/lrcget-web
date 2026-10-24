@@ -7,17 +7,35 @@ license = "MIT"
 repository = "https://github.com/tranxuanthang/lrcget"
 edition = "2021"
 rust-version = "1.81"
+default-run = "lrcget"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# Shared core (database, scanner, LRCLIB client, commands) used by both binaries.
+[lib]
+name = "lrcget_lib"
+path = "src/lib.rs"
+
+# Tauri desktop app.
+[[bin]]
+name = "lrcget"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+# Self-hosted web server: `cargo run --bin lrcget-server --no-default-features --features server`
+[[bin]]
+name = "lrcget-server"
+path = "src/bin/lrcget-server/main.rs"
+required-features = ["server"]
+
 [build-dependencies]
-tauri-build = { version = "2.5.6", features = [] }
+tauri-build = { version = "2.5.6", features = [], optional = true }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-tauri = { version = "2.10.1", features = [ "protocol-asset", "devtools"] }
+tauri = { version = "2.10.1", features = [ "protocol-asset", "devtools"], optional = true }
 globwalk = "0.9.1"
 reqwest = { version = "0.12.7", features = ["json"] }
 lofty = "0.24.0"
@@ -34,26 +52,42 @@ indoc = "2"
 tokio = { version = "1.40", features = ["full"] }
 ring = "0.17.8"
 data-encoding = "2.4.0"
-kira = "0.12.0"
+kira = { version = "0.12.0", optional = true }
 symphonia = { version = "0.5.4", features = ["all"] }
 regex = "1.10.4"
 charabia = "0.10.0"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
-tauri-plugin-os = "2.3.2"
-tauri-plugin-shell = "2.3.5"
-tauri-plugin-dialog = "2.7.0"
-tauri-plugin-clipboard-manager = "2.3.2"
+tauri-plugin-os = { version = "2.3.2", optional = true }
+tauri-plugin-shell = { version = "2.3.5", optional = true }
+tauri-plugin-dialog = { version = "2.7.0", optional = true }
+tauri-plugin-clipboard-manager = { version = "2.3.2", optional = true }
+axum = { version = "0.8", features = ["ws"], optional = true }
+tower-http = { version = "0.6", features = ["fs"], optional = true }
 # W3C WebDriver server for agent-driven inspection (debug builds only, see AGENTS.md)
 [target.'cfg(debug_assertions)'.dependencies]
-tauri-plugin-webdriver = "0.2"
+tauri-plugin-webdriver = { version = "0.2", optional = true }
 
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
-default = [ "custom-protocol" ]
+default = [ "desktop", "custom-protocol" ]
+# Tauri desktop app with the native (Kira) audio player
+desktop = [
+  "dep:tauri",
+  "dep:tauri-build",
+  "dep:tauri-plugin-os",
+  "dep:tauri-plugin-shell",
+  "dep:tauri-plugin-dialog",
+  "dep:tauri-plugin-clipboard-manager",
+  "dep:tauri-plugin-global-shortcut",
+  "dep:tauri-plugin-webdriver",
+  "dep:kira",
+]
+# Web server; audio plays in the browser instead
+server = [ "dep:axum", "dep:tower-http" ]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
-custom-protocol = [ "tauri/custom-protocol" ]
+custom-protocol = [ "tauri?/custom-protocol" ]
 
 [profile.dev.package.kira]
 opt-level = 3
@@ -80,4 +114,4 @@ opt-level = 3
 opt-level = 3
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-global-shortcut = "2.3.1"
+tauri-plugin-global-shortcut = { version = "2.3.1", optional = true }

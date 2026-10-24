@@ -10,18 +10,14 @@ use indoc::indoc;
 use rusqlite::{named_params, params, Connection, OptionalExtension};
 use rusqlite_migration::Migrations;
 use std::fs;
-use tauri::{AppHandle, Manager};
+use std::path::Path;
 
 static MIGRATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/migrations");
 
 /// Initializes the database connection, creating the .sqlite file if needed, and upgrading the
 /// database if it's out of date.
-pub fn initialize_database(app_handle: &AppHandle) -> Result<Connection, rusqlite::Error> {
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .expect("The app data directory should exist.");
-    fs::create_dir_all(&app_dir).expect("The app data directory should be created.");
+pub fn initialize_database(app_dir: &Path) -> Result<Connection, rusqlite::Error> {
+    fs::create_dir_all(app_dir).expect("The app data directory should be created.");
     let sqlite_path = app_dir.join("db.sqlite3");
 
     println!("Database file path: {}", sqlite_path.display());

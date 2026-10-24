@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/platform'
 import { ref } from 'vue'
 
 export function useEditLyricsV2Export({ audioSource, saveLyrics, serializedLyricsfile, toast }) {

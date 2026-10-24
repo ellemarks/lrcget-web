@@ -116,7 +116,7 @@
 import Alert from '~icons/mdi/alert'
 import CheckCircle from '~icons/mdi/check-circle'
 import { ref, computed } from 'vue'
-import { getVersion } from '@tauri-apps/api/app'
+import { getVersion } from '@/platform'
 import semver from 'semver'
 import CopyablePre from '@/components/CopyablePre.vue'
 import BaseModal from '@/components/common/BaseModal.vue'

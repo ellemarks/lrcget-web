@@ -103,8 +103,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
+import { invoke, open } from '@/platform'
 import { useToast } from 'vue-toastification'
 import Loading from '~icons/mdi/loading'
 import Magnify from '~icons/mdi/magnify'
