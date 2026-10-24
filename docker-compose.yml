@@ -3,7 +3,7 @@
 #   cp .env.example .env    # then set your music folder and a password
 #   docker compose up -d
 #
-# This pulls the published image (amd64). To build from this checkout instead, run
+# This pulls the published image (amd64 and arm64). To build from this checkout instead, run
 # `docker compose up -d --build`.
 #
 # and open http://<host>:3000
