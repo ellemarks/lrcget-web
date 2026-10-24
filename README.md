@@ -1,3 +1,10 @@
+> [!WARNING]
+> **This is the old, unmaintained KasmVNC version of this fork.** It runs the LRCGET desktop app inside a remote desktop in your browser.
+>
+> It has been replaced by a native web version of LRCGET with its own server, browser audio playback, and a regular Docker image. See the [`main` branch](https://github.com/ellemarks/lrcget-web) for the current version and setup instructions.
+>
+> This branch is kept for reference only and won't get updates.
+
 # LRCGET
 
 Utility for mass-downloading LRC synced lyrics for your offline music library.
